@@ -154,8 +154,9 @@ local function refresh_nodes(node, projects)
     end
   end
 end
+
 local event_running = false
-local refresh_tree_internal = function ()
+local function refresh_tree_internal()
   if not M.Tree.cwd or vim.v.exiting ~= vim.NIL then
     return
   end
@@ -617,8 +618,12 @@ function M.toggle_open_buffers_only(forceTrue)
   else
     pops.show_open_buffers_only = not pops.show_open_buffers_only
   end
-  M.refresh_tree()
-  M.expand_all()
+
+  if pops.show_open_buffers_only then
+    M.refresh_tree(M.expand_all)
+  else
+    M.refresh_tree()
+  end
 end
 
 function M.toggle_help()
