@@ -1,10 +1,19 @@
+<<<<<<< HEAD
+=======
+local config = require'nvim-tree.config'
+local git = require'nvim-tree.git'
+local buffers = require'nvim-tree.buffers'
+local icon_config = config.get_icon_state()
+
+>>>>>>> f4f4dad (feat: add "open buffers only" toggle)
 local api = vim.api
 local luv = vim.loop
 
 local utils = require'nvim-tree.utils'
 
 local M = {
-  ignore_list = {}
+  ignore_list = {},
+  show_open_buffers_only = false
 }
 
 local function dir_new(cwd, name, status, parent_ignored)
@@ -24,7 +33,13 @@ local function dir_new(cwd, name, status, parent_ignored)
     absolute_path = absolute_path,
     -- TODO: last modified could also involve atime and ctime
     last_modified = last_modified,
+<<<<<<< HEAD
     open = false,
+=======
+    match_name = path_to_matching_str(name),
+    match_path = path_to_matching_str(absolute_path),
+    open = M.show_open_buffers_only,
+>>>>>>> f4f4dad (feat: add "open buffers only" toggle)
     group_next = nil,   -- If node is grouped, this points to the next child dir/link node
     has_children = has_children,
     entries = {},
@@ -169,13 +184,27 @@ function M.refresh_entries(entries, cwd, parent_node, status)
   local new_entries = {}
   local num_new_entries = 0
 
+  local allowed_paths = {}
+  if M.show_open_buffers_only then
+    allowed_paths = buffers.get_open_buffer_paths()
+  end
+
   while true do
     local name, t = luv.fs_scandir_next(handle)
     if not name then break end
     num_new_entries = num_new_entries + 1
 
     local abs = utils.path_join({cwd, name})
+<<<<<<< HEAD
     if not should_ignore(abs) and not should_ignore_git(abs, status.files) then
+=======
+    local should_skip = should_ignore(abs)
+    if M.show_open_buffers_only then
+      should_skip = not allowed_paths[abs]
+    end
+
+    if not should_skip then
+>>>>>>> f4f4dad (feat: add "open buffers only" toggle)
       if not t then
         local stat = luv.fs_stat(abs)
         t = stat and stat.type
@@ -277,6 +306,10 @@ function M.populate(entries, cwd, parent_node, status)
     return
   end
 
+  local open_buffer_paths = {}
+  if M.show_open_buffers_only then
+    open_buffer_paths = buffers.get_open_buffer_paths()
+  end
   local dirs = {}
   local links = {}
   local files = {}
@@ -286,7 +319,16 @@ function M.populate(entries, cwd, parent_node, status)
     if not name then break end
 
     local abs = utils.path_join({cwd, name})
+<<<<<<< HEAD
     if not should_ignore(abs) and not should_ignore_git(abs, status.files) then
+=======
+    local should_skip = should_ignore(abs)
+    if M.show_open_buffers_only then
+      should_skip = not open_buffer_paths[abs]
+    end
+
+    if not should_skip then
+>>>>>>> f4f4dad (feat: add "open buffers only" toggle)
       if not t then
         local stat = luv.fs_stat(abs)
         t = stat and stat.type

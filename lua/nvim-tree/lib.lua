@@ -144,18 +144,22 @@ local function refresh_nodes(node, projects)
   local project_root = git.get_project_root(node.absolute_path or node.cwd)
   refresh_entries(node.entries, node.absolute_path or node.cwd, node, projects[project_root] or {})
   for _, entry in ipairs(node.entries) do
+    -- if we are in opened buffers mode, auto expand all folders
+    if pops.show_open_buffers_only and entry.entries then
+      entry.open = true
+    end
+
     if entry.entries and entry.open then
       refresh_nodes(entry, projects)
     end
   end
 end
-
 local event_running = false
-function M.refresh_tree()
-  if event_running or not M.Tree.cwd or vim.v.exiting ~= vim.NIL then
+local refresh_tree_internal = function ()
+  if not M.Tree.cwd or vim.v.exiting ~= vim.NIL then
     return
   end
-  event_running = true
+  refresh_nodes(M.Tree)
 
   git.reload(function(projects)
     refresh_nodes(M.Tree, projects)
@@ -165,6 +169,16 @@ function M.refresh_tree()
     diagnostics.update()
     event_running = false
   end)
+
+  if view.win_open() then
+    if pops.show_open_buffers_only then
+      M.expand_all()
+    else
+      renderer.draw(M.Tree, true)
+    end
+  else
+    M.Tree.loaded = false
+  end
 end
 
 local function reload_node_status(parent_node, projects)
@@ -193,6 +207,16 @@ function M.reload_git()
     M.redraw()
     event_running = false
   end)
+end
+
+local refresh_tree_callback = function (success, result)
+  if not success then
+    print("Error calling nvim-tree.lib.refresh_tree():", result)
+  end
+end
+
+function M.refresh_tree()
+  utils.debounce('refresh_tree', refresh_tree_internal, 200, refresh_tree_callback)
 end
 
 function M.set_index_and_redraw(fname)
@@ -457,6 +481,20 @@ function M.collapse_all()
   M.redraw()
 end
 
+function M.expand_all()
+  local function iter(nodes)
+    for _, node in pairs(nodes) do
+      if node.entries then
+        node.open = true
+        iter(node.entries)
+      end
+    end
+  end
+
+  iter(M.Tree.entries)
+  M.redraw()
+end
+
 function M.change_dir(name)
   local foldername = name == '..' and vim.fn.fnamemodify(M.Tree.cwd, ':h') or name
   local no_cwd_change = vim.fn.expand(foldername) == M.Tree.cwd
@@ -571,6 +609,16 @@ end
 function M.toggle_dotfiles()
   pops.config.filter_dotfiles = not pops.config.filter_dotfiles
   return M.refresh_tree()
+end
+
+function M.toggle_open_buffers_only(forceTrue)
+  if forceTrue == true then
+    pops.show_open_buffers_only = true
+  else
+    pops.show_open_buffers_only = not pops.show_open_buffers_only
+  end
+  M.refresh_tree()
+  M.expand_all()
 end
 
 function M.toggle_help()
