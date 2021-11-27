@@ -140,6 +140,68 @@ function M.expand_or_collapse(node)
   diagnostics.update()
 end
 
+function M.get_visible_file_entries()
+  local visible_files = {
+    files_by_index = {},
+    files_by_name = {},
+  }
+  local i = 0
+
+  local function iter(entries)
+    for _, entry in ipairs(entries) do
+      if entry.entries ~= nil then
+        if entry.open then
+          iter(entry.entries)
+        end
+      else
+        i = i + 1
+        local file_lookup_info = {
+          index = i,
+          name = entry.absolute_path,
+          file = entry,
+        }
+        visible_files.files_by_index[i] = file_lookup_info
+        visible_files.files_by_name[entry.absolute_path] = file_lookup_info
+      end
+    end
+  end
+  iter(M.Tree.entries)
+  return visible_files
+end
+
+function M.edit_next_file(offset)
+  offset = offset or 1
+  local visible_files = M.get_visible_file_entries()
+  if api.nvim_buf_get_option(0, 'ft') == 'NvimTree' then
+    vim.cmd('wincmd p')
+  end
+  local current_file_name = vim.api.nvim_buf_get_name(0)
+  local curent_file_info = visible_files.files_by_name[current_file_name]
+  if curent_file_info then
+    local index = curent_file_info.index + offset
+    if index > #visible_files.files_by_index then
+      index = 1
+    elseif index < 1 then
+      index = #visible_files.files_by_index
+    end
+    local next_file = visible_files.files_by_index[index]
+    if next_file then
+      vim.cmd(string.format("edit %s", next_file.file.absolute_path))
+    end
+  end
+end
+
+local function refresh_git(node)
+  if not node then node = M.Tree end
+  git.update_status(node.entries, node.absolute_path or node.cwd, node, false)
+  for _, entry in pairs(node.entries) do
+    if entry.entries and #entry.entries > 0 then
+      refresh_git(entry)
+    end
+  end
+end
+
+-- TODO update only entries where directory has changed
 local function refresh_nodes(node, projects)
   local project_root = git.get_project_root(node.absolute_path or node.cwd)
   refresh_entries(node.entries, node.absolute_path or node.cwd, node, projects[project_root] or {})
